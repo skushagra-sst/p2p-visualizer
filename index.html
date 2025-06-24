@@ -1,0 +1,1301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Network Diagram Editor</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #network {
+            width: 100vw;
+            height: 100vh;
+            display: block;
+        }
+        .node circle {
+            stroke-width: 2px;
+            cursor: pointer;
+            transition: stroke 0.2s, stroke-width 0.2s, filter 0.2s;
+        }
+        .node circle.highlighted {
+            stroke: #ff9800;
+            stroke-width: 4px;
+            filter: drop-shadow(0 0 8px rgba(255, 152, 0, 0.7));
+        }
+        .node text {
+            pointer-events: none;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .link {
+            stroke-width: 3px;
+            stroke-opacity: 0.7;
+            cursor: pointer;
+            transition: stroke 0.2s, stroke-width 0.2s, stroke-opacity 0.2s;
+        }
+        .link.highlighted {
+            stroke: #ff9800;
+            stroke-width: 5px;
+            stroke-opacity: 1;
+            filter: drop-shadow(0 0 4px rgba(255, 152, 0, 0.7));
+        }
+        .link.selected, .link:hover {
+            stroke-width: 5px;
+        }
+        .node.selected circle {
+            stroke-width: 4px;
+        }
+        .control-bar {
+            position: fixed;
+            left: 50%;
+            bottom: 32px;
+            transform: translateX(-50%);
+            background: var(--bar-bg);
+            color: var(--bar-fg);
+            border-radius: 18px;
+            box-shadow: 0 4px 32px 0 rgba(0,0,0,0.13), 0 1.5px 0 0 var(--bar-border);
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            padding: 0.35em 1.1em 0.35em 1.1em;
+            z-index: 20;
+            border: 1.5px solid var(--bar-border);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            min-height: 54px;
+        }
+        .control-bar > button {
+            flex-shrink: 0;
+        }
+        .control-bar > div {
+            flex: 1;
+        }
+        .control-bar select {
+            font-size: 1em;
+            padding: 0.45em 1.2em;
+            border-radius: 999px;
+            border: 1px solid var(--bar-border);
+            background: var(--bar-btn-bg);
+            color: var(--bar-fg);
+            transition: box-shadow 0.2s, border 0.2s, background 0.2s, color 0.2s;
+            outline: none;
+            margin-right: 0.7em;
+            min-width: 120px;
+        }
+        .control-bar button {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25em;
+            width: 40px;
+            height: 40px;
+            min-width: 40px;
+            min-height: 40px;
+            border-radius: 50%;
+            border: 1.5px solid var(--bar-border);
+            background: var(--bar-btn-bg);
+            color: var(--bar-fg);
+            cursor: pointer;
+            transition: background 0.2s, color 0.2s, border 0.2s;
+            outline: none;
+        }
+        .control-bar button.active, .control-bar button:focus {
+            background: var(--bar-btn-active-bg);
+            color: var(--bar-btn-active-fg);
+            border: 1.5px solid var(--bar-btn-active-border);
+        }
+        .control-bar button:hover {
+            background: var(--bar-btn-hover-bg);
+            color: var(--bar-btn-hover-fg);
+        }
+        .control-bar .material-icons {
+            font-size: 1.25em;
+        }
+        #info {
+            position: fixed;
+            left: 32px;
+            bottom: 32px;
+            font-size: 1.1em;
+            background: var(--info-bg);
+            color: var(--info-fg);
+            padding: 8px 18px;
+            border-radius: 8px;
+            box-shadow: 0 1px 6px rgba(0,0,0,0.10);
+            z-index: 20;
+            min-width: 120px;
+        }
+        .floating-title-bar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 64px;
+            background: var(--bar-bg);
+            color: var(--bar-fg);
+            box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18), 0 1.5px 0 0 var(--bar-border);
+            border-bottom: 1.5px solid var(--bar-border);
+            backdrop-filter: blur(16px) saturate(160%);
+            -webkit-backdrop-filter: blur(16px) saturate(160%);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            padding-left: 40px;
+            padding-right: 32px;
+            user-select: none;
+            gap: 12px;
+        }
+        .floating-title-bar .title-text {
+            font-size: 1.5em;
+            font-weight: 700;
+            letter-spacing: 0.01em;
+            color: var(--bar-fg);
+            text-shadow: 0 1px 8px rgba(0,0,0,0.10);
+        }
+        /* Theme variables */
+        body[data-theme="dark"] {
+            --bg: #1a1a1a;
+            --dot: #cacaca;
+            --dot-opacity: 0.3;
+            --node-fill: #23242a;
+            --node-stroke: #bbb;
+            --node-text: #f1f1f1;
+            --link: #444a57;
+            --link-hover: #90caf9;
+            --bar-bg: #1a1a1a;
+            --bar-fg: #f1f1f1;
+            --bar-border: #23242a;
+            --bar-btn-bg: #23242a;
+            --bar-btn-hover-bg: #333;
+            --bar-btn-hover-fg: #90caf9;
+            --bar-btn-active-bg: #90caf9;
+            --bar-btn-active-fg: #1a1a1a;
+            --bar-btn-active-border: #90caf9;
+            --info-bg: rgba(35,36,42,0.95);
+            --info-fg: #b0b0b0;
+        }
+        body[data-theme="light"] {
+            --bg: #f6f7f9;
+            --dot: #cacaca;
+            --dot-opacity: 0.5;
+            --node-fill: #fff;
+            --node-stroke: #222;
+            --node-text: #222;
+            --link: #b0b0b0;
+            --link-hover: #1976d2;
+            --bar-bg: #fff;
+            --bar-fg: #222;
+            --bar-border: #e0e0e0;
+            --bar-btn-bg: #fff;
+            --bar-btn-hover-bg: #f0f0f0;
+            --bar-btn-hover-fg: #1976d2;
+            --bar-btn-active-bg: #1976d2;
+            --bar-btn-active-fg: #fff;
+            --bar-btn-active-border: #1976d2;
+            --info-bg: rgba(255,255,255,0.95);
+            --info-fg: #888;
+        }
+        .viz-dropdown-container {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .viz-dropdown {
+            position: absolute;
+            left: 50%;
+            bottom: 48px;
+            transform: translateX(-50%);
+            background: var(--bar-bg);
+            color: var(--bar-fg);
+            border-radius: 12px;
+            box-shadow: 0 2px 16px rgba(0,0,0,0.10);
+            min-width: 320px;
+            z-index: 1000;
+        }
+        .viz-modal-overlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.25);
+            z-index: 2000;
+        }
+        .viz-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--bar-bg);
+            color: var(--bar-fg);
+            border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+            min-width: 340px;
+            z-index: 2100;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: stretch;
+        }
+        .viz-modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 20px 8px 20px;
+            border-bottom: 1px solid var(--bar-border);
+        }
+        .viz-modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5em;
+            color: var(--bar-fg);
+            cursor: pointer;
+            padding: 0 4px;
+        }
+        .viz-modal-body {
+            padding: 18px 20px 24px 20px;
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+        }
+        /* Hide old dropdown */
+        .viz-dropdown { display: none !important; }
+        
+        /* Visualizer container */
+        .visualizer-container {
+            position: fixed;
+            right: 20px;
+            bottom: 20px;
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: 400px;
+        }
+        
+        /* Algorithm selector tabs */
+        .algo-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+        
+        .algo-tab {
+            padding: 6px 12px;
+            background: var(--bar-btn-bg);
+            border: 1px solid var(--bar-border);
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            font-size: 0.9em;
+            color: var(--bar-fg);
+        }
+        
+        .algo-tab.active {
+            background: var(--bar-btn-active-bg);
+            color: var(--bar-btn-active-fg);
+            border-color: var(--bar-btn-active-border);
+        }
+        
+        .bfs-floating-panel, .dfs-floating-panel, .bridge-floating-panel {
+            background: var(--bar-bg);
+            border: 1.5px solid var(--bar-border);
+            border-radius: 12px;
+            box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18);
+            width: 380px;
+            backdrop-filter: blur(16px) saturate(160%);
+            -webkit-backdrop-filter: blur(16px) saturate(160%);
+            color: var(--bar-fg);
+            display: none; /* Hidden by default */
+            position: absolute;
+            bottom: 50px;
+            right: 0;
+        }
+        
+        .bfs-floating-panel.visible, .dfs-floating-panel.visible, .bridge-floating-panel.visible {
+            display: block; /* Show when active */
+        }
+        .bfs-panel-header, .dfs-panel-header, .bridge-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 18px 6px 18px;
+            border-bottom: 1px solid var(--bar-border);
+        }
+        .bfs-panel-body, .dfs-panel-body, .bridge-panel-body {
+            padding: 14px 18px 18px 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        
+        .algo-controls {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .algo-select {
+            flex: 1;
+            min-width: 100px;
+        }
+        
+        .algo-button {
+            white-space: nowrap;
+            border-radius: 8px;
+            padding: 0.4em 1em;
+            border: 1.5px solid var(--bar-border);
+            background: var(--bar-btn-bg);
+            color: var(--bar-fg);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .algo-button:hover {
+            background: var(--bar-btn-hover-bg);
+            color: var(--bar-btn-hover-fg);
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+</head>
+<body data-theme="dark">
+    <div class="floating-title-bar">
+        <span class="material-icons" style="font-size:2em;margin-right:18px;opacity:0.85;">hub</span>
+        <span class="title-text">Peer to Peer Network Visualizer</span>
+    </div>
+    <div class="control-bar">
+        <button id="addNode" title="Add Computer" tabindex="1"><span class="material-icons">add</span></button>
+        <button id="connectMode" title="Connect Devices" tabindex="2"><span class="material-icons">link</span></button>
+        <button id="deleteNode" title="Delete Device" tabindex="3"><span class="material-icons">delete</span></button>
+        <button id="removeEdge" title="Remove Edge" tabindex="4"><span class="material-icons">remove</span></button>
+        <button id="themeSwitch" title="Switch Theme" tabindex="5"><span class="material-icons" id="themeIcon">dark_mode</span></button>
+        <button id="randomGraph" title="Generate Random Graph" tabindex="6"><span class="material-icons">auto_graph</span></button>
+    </div>
+    <div id="info"></div>
+    <svg id="network"></svg>
+    <div class="visualizer-container">
+        <div class="algo-tabs">
+            <div class="algo-tab active" data-algo="bfs">BFS</div>
+            <div class="algo-tab" data-algo="dfs">DFS</div>
+            <div class="algo-tab" data-algo="bridge">SPOF</div>
+        </div>
+        
+        <div class="bfs-floating-panel visible" id="bfsFloatingPanel">
+            <div class="bfs-panel-header">
+                <span style="font-weight:600;font-size:1.05em;">Breadth-First Search</span>
+            </div>
+            <div class="bfs-panel-body">
+                <div class="algo-controls">
+                    <label for="bfsStart">From</label>
+                    <select id="bfsStart" class="algo-select"></select>
+                    <label for="bfsEnd">to</label>
+                    <select id="bfsEnd" class="algo-select"></select>
+                    <button id="bfsVisualize" class="algo-button">
+                        <span class="material-icons" style="font-size: 1em; vertical-align: middle; margin-right: 4px;">play_arrow</span>
+                        Visualize
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="dfs-floating-panel" id="dfsFloatingPanel">
+            <div class="dfs-panel-header">
+                <span style="font-weight:600;font-size:1.05em;">Depth-First Search</span>
+            </div>
+            <div class="dfs-panel-body">
+                <div class="algo-controls">
+                    <label for="dfsStart">From</label>
+                    <select id="dfsStart" class="algo-select"></select>
+                    <label for="dfsEnd">to</label>
+                    <select id="dfsEnd" class="algo-select"></select>
+                    <button id="dfsVisualize" class="algo-button">
+                        <span class="material-icons" style="font-size: 1em; vertical-align: middle; margin-right: 4px;">play_arrow</span>
+                        Visualize
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bridge-floating-panel" id="bridgeFloatingPanel">
+            <div class="bridge-panel-header">
+                <span style="font-weight:600;font-size:1.05em;">Single Point of Failure Detection</span>
+            </div>
+            <div class="bridge-panel-body">
+                <button id="findBridges" class="algo-button" style="width: 100%;">
+                    <span class="material-icons" style="font-size: 1em; vertical-align: middle; margin-right: 6px;">search</span>
+                    Find Single Point of Failures
+                </button>
+            </div>
+        </div>
+    </div>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script>
+        // Theme logic
+        let theme = 'dark';
+        const themeSwitch = document.getElementById('themeSwitch');
+        const themeIcon = document.getElementById('themeIcon');
+        function setTheme(newTheme) {
+            theme = newTheme;
+            document.body.setAttribute('data-theme', theme);
+            themeIcon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
+            // Redraw background dots
+            update();
+            // Set SVG background color directly
+            const bg = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+            document.getElementById('network').style.backgroundColor = bg;
+        }
+        themeSwitch.onclick = function() {
+            setTheme(theme === 'dark' ? 'light' : 'dark');
+        };
+
+        // Remove floating side buttons
+        // Enable panning (but not zoom) on the SVG canvas
+        let panTransform = d3.zoomIdentity;
+        let isPanning = false;
+        const svg = d3.select('#network');
+
+        // Helper to get SVG (graph) coordinates from event, accounting for panTransform
+        function getGraphCoords(event) {
+            return {
+                x: (event.x - panTransform.x) / panTransform.k,
+                y: (event.y - panTransform.y) / panTransform.k
+            };
+        }
+
+        let nodeDragOffset = { x: 0, y: 0 };
+        let isNodeDragging = false;
+
+        function dragstarted(event, d) {
+            isNodeDragging = true;
+            d3.select(this).raise();
+            // Calculate offset between mouse and node center in graph coordinates
+            const coords = getGraphCoords(event);
+            nodeDragOffset.x = d.x - coords.x;
+            nodeDragOffset.y = d.y - coords.y;
+        }
+        function dragged(event, d) {
+            const coords = getGraphCoords(event);
+            d.x = coords.x + nodeDragOffset.x;
+            d.y = coords.y + nodeDragOffset.y;
+            update();
+        }
+        function dragended(event, d) {
+            isNodeDragging = false;
+        }
+
+        // Update d3.zoom filter to disable panning when dragging a node
+        svg.call(
+            d3.zoom()
+                .filter(function(event) {
+                    // Only allow zoom (pan) if not dragging a node and left mouse button
+                    return !isNodeDragging && event.button === 0 && (event.type === 'mousedown' || event.type === 'mousemove' || event.type === 'mouseup');
+                })
+                .scaleExtent([1, 1]) // Disable zoom
+                .on('start', () => {
+                    isPanning = true;
+                    document.getElementById('network').style.cursor = 'grabbing';
+                })
+                .on('end', () => {
+                    isPanning = false;
+                    document.getElementById('network').style.cursor = 'grab';
+                })
+                .on('zoom', (event) => {
+                    panTransform = event.transform;
+                    svg.select('g.graph').attr('transform', panTransform);
+                    update();
+                })
+        );
+        document.body.style.overflow = 'hidden';
+
+        // Dot grid parameters (theme aware)
+        function getDotParams() {
+            return {
+                dotSpacing: 28,
+                dotRadius: 1.2,
+                dotColor: getComputedStyle(document.body).getPropertyValue('--dot').trim(),
+                dotOpacity: parseFloat(getComputedStyle(document.body).getPropertyValue('--dot-opacity'))
+            };
+        }
+
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+        let nodes = [];
+        let links = [];
+        let dfsPath = null;
+        let nodeId = 1;
+        let selectedNode = null;
+        let connectMode = false;
+        let deleteMode = false;
+        let removeEdgeMode = false;
+        let connectSource = null;
+        let selectedLink = null;
+        const deviceIcons = {
+            computer: '\u{1F5A5}' // 🖥
+        };
+        const info = document.getElementById('info');
+        const btns = {
+            connect: document.getElementById('connectMode'),
+            delete: document.getElementById('deleteNode'),
+            removeEdge: document.getElementById('removeEdge')
+        };
+
+        function drawBgDots(g, panTransform) {
+            g.selectAll('g.bg-dots').remove();
+            const { dotSpacing, dotRadius, dotColor, dotOpacity } = getDotParams();
+            function mod(n, m) { return ((n % m) + m) % m; }
+            const offsetX = -mod(panTransform.x, dotSpacing);
+            const offsetY = -mod(panTransform.y, dotSpacing);
+            const cols = Math.ceil(window.innerWidth / dotSpacing) + 10;
+            const rows = Math.ceil(window.innerHeight / dotSpacing) + 10;
+            const dots = [];
+            for (let i = -5; i < cols; i++) {
+                for (let j = -5; j < rows; j++) {
+                    dots.push({
+                        cx: i * dotSpacing + offsetX,
+                        cy: j * dotSpacing + offsetY
+                    });
+                }
+            }
+            const bg = g.insert('g', ':first-child').attr('class', 'bg-dots');
+            bg.selectAll('circle')
+                .data(dots)
+                .join('circle')
+                .attr('cx', d => d.cx)
+                .attr('cy', d => d.cy)
+                .attr('r', dotRadius)
+                .attr('fill', dotColor)
+                .attr('opacity', dotOpacity);
+        }
+
+        // --- Utility for random connected graph ---
+        function generateRandomConnectedGraph(n = 10, width = window.innerWidth, height = window.innerHeight) {
+            let nodes = [];
+            let links = [];
+            let nodeId = 1;
+            for (let i = 0; i < n; i++) {
+                nodes.push({
+                    id: nodeId++,
+                    label: `Computer ${nodeId-1}`,
+                    type: 'computer',
+                    x: 150 + Math.random() * (width - 300),
+                    y: 150 + Math.random() * (height - 300)
+                });
+            }
+            // Spanning tree
+            let unvisited = nodes.slice();
+            let visited = [unvisited.pop()];
+            while (unvisited.length) {
+                let fromNode = visited[Math.floor(Math.random() * visited.length)];
+                let toNode = unvisited.splice(Math.floor(Math.random() * unvisited.length), 1)[0];
+                links.push({ source: fromNode, target: toNode });
+                visited.push(toNode);
+            }
+            // Extra edges
+            let edgeSet = new Set(links.map(e => `${Math.min(e.source.id, e.target.id)}-${Math.max(e.source.id, e.target.id)}`));
+            let numExtra = Math.floor(n / 2);
+            for (let i = 0; i < numExtra; i++) {
+                let a = nodes[Math.floor(Math.random() * nodes.length)];
+                let b = nodes[Math.floor(Math.random() * nodes.length)];
+                if (a.id === b.id) continue;
+                let key = `${Math.min(a.id, b.id)}-${Math.max(a.id, b.id)}`;
+                if (!edgeSet.has(key)) {
+                    links.push({ source: a, target: b });
+                    edgeSet.add(key);
+                }
+            }
+            return { nodes, links };
+        }
+
+        // --- DFS implementation ---
+        function dfs(nodes, links, startId, endId) {
+            const adj = {};
+            for (const node of nodes) adj[node.id] = [];
+            for (const e of links) {
+                adj[e.source.id].push(e.target.id);
+                adj[e.target.id].push(e.source.id);
+            }
+            const visited = new Set();
+            const path = [];
+            function dfsVisit(u) {
+                visited.add(u);
+                path.push(u);
+                if (u === endId) return true;
+                for (const v of adj[u]) {
+                    if (!visited.has(v)) {
+                        if (dfsVisit(v)) return true;
+                    }
+                }
+                path.pop();
+                return false;
+            }
+            if (dfsVisit(startId)) {
+                return path.map(id => nodes.find(n => n.id === id));
+            }
+            return null;
+        }
+
+        // --- D3 force layout for clear graph ---
+        async function runForceLayout(nodes, links) {
+            return new Promise(resolve => {
+                const simulation = d3.forceSimulation(nodes)
+                    .force("link", d3.forceLink(links).id(d => d.id).distance(180).strength(0.8))
+                    .force("charge", d3.forceManyBody().strength(-900))
+                    .force("center", d3.forceCenter(window.innerWidth/2, window.innerHeight/2))
+                    .force("collide", d3.forceCollide(38))
+                    .stop();
+                // Run the simulation for a fixed number of steps
+                for (let i = 0; i < 180; ++i) simulation.tick();
+                simulation.stop();
+                resolve();
+            });
+        }
+
+        // --- UI/Rendering logic ---
+        function updateDropdowns() {
+            const startSels = document.querySelectorAll('#dfsStart');
+            const endSels = document.querySelectorAll('#dfsEnd');
+            startSels.forEach(startSel => startSel.innerHTML = '');
+            endSels.forEach(endSel => endSel.innerHTML = '');
+            for (const n of nodes) {
+                startSels.forEach(startSel => {
+                    const opt = document.createElement('option');
+                    opt.value = n.id;
+                    opt.textContent = n.label;
+                    startSel.appendChild(opt);
+                });
+                endSels.forEach(endSel => {
+                    const opt = document.createElement('option');
+                    opt.value = n.id;
+                    opt.textContent = n.label;
+                    endSel.appendChild(opt);
+                });
+            }
+            if (nodes.length > 1) {
+                endSels.forEach(endSel => endSel.selectedIndex = 1);
+            }
+        }
+        // --- Update function ---
+        function update() {
+            updateDropdowns();
+            document.getElementById('network').style.backgroundColor = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+            svg.selectAll('g.graph').remove();
+            const g = svg.append('g').attr('class', 'graph');
+            drawBgDots(g, {x:0, y:0, k:1});
+            // Draw links
+            g.selectAll('line.link')
+                .data(links)
+                .join('line')
+                .attr('class', d => 'link')
+                .attr('stroke', d => {
+                    if (dfsPath && isEdgeInPath(d, dfsPath)) return '#ff9800';
+                    return getComputedStyle(document.body).getPropertyValue('--link').trim();
+                })
+                .attr('stroke-width', d => (dfsPath && isEdgeInPath(d, dfsPath)) ? 5 : 3)
+                .attr('stroke-opacity', 0.7)
+                .attr('x1', d => d.source.x)
+                .attr('y1', d => d.source.y)
+                .attr('x2', d => d.target.x)
+                .attr('y2', d => d.target.y);
+            // Draw nodes
+            g.selectAll('g.node')
+                .data(nodes, d => d.id)
+                .join('g')
+                .attr('class', 'node')
+                .attr('transform', d => `translate(${d.x},${d.y})`)
+                .call(d3.drag()
+                    .on('start', function(event, d) {
+                        d3.select(this).raise();
+                        d._dragOffset = { x: d.x - event.x, y: d.y - event.y };
+                    })
+                    .on('drag', function(event, d) {
+                        d.x = event.x + (d._dragOffset ? d._dragOffset.x : 0);
+                        d.y = event.y + (d._dragOffset ? d._dragOffset.y : 0);
+                        update();
+                    })
+                    .on('end', function(event, d) {
+                        delete d._dragOffset;
+                    })
+                )
+                .each(function(d) {
+                    const nodeG = d3.select(this);
+                    nodeG.selectAll('circle').remove();
+                    nodeG.selectAll('text').remove();
+                    nodeG.append('circle')
+                        .attr('r', 28)
+                        .attr('fill', getComputedStyle(document.body).getPropertyValue('--node-fill').trim())
+                        .attr('stroke', getComputedStyle(document.body).getPropertyValue('--node-stroke').trim())
+                        .attr('stroke-width', dfsPath && isNodeInPath(d, dfsPath) ? 4 : 2)
+                        .attr('filter', dfsPath && isNodeInPath(d, dfsPath) ? 'url(#glow)' : null);
+                    nodeG.append('text')
+                        .attr('y', 6)
+                        .attr('text-anchor', 'middle')
+                        .attr('font-size', 30)
+                        .attr('fill', getComputedStyle(document.body).getPropertyValue('--node-text').trim())
+                        .text('\u{1F5A5}');
+                    nodeG.append('text')
+                        .attr('y', 38)
+                        .attr('text-anchor', 'middle')
+                        .attr('font-size', 13)
+                        .attr('fill', getComputedStyle(document.body).getPropertyValue('--node-text').trim())
+                        .text(d.label);
+                });
+        }
+        function isEdgeInPath(edge, path) {
+            for (let i = 1; i < path.length; i++) {
+                if ((edge.source === path[i-1] && edge.target === path[i]) || (edge.source === path[i] && edge.target === path[i-1])) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        function isNodeInPath(node, path) {
+            return path && path.some(n => n === node);
+        }
+        // --- Button handlers ---
+        document.getElementById('addNode').onclick = function() {
+            nodes.push({ id: nodeId++, type: 'computer', label: `Computer ${nodeId-1}`, x: 150 + Math.random() * (width - 300), y: 150 + Math.random() * (height - 300) });
+            update();
+        };
+        btns.connect.onclick = function() {
+            connectMode = !connectMode;
+            deleteMode = false;
+            removeEdgeMode = false;
+            connectSource = null;
+            info.textContent = connectMode ? 'Click two devices to connect.' : '';
+            setActiveBtn('connect');
+        };
+        btns.delete.onclick = function() {
+            deleteMode = !deleteMode;
+            connectMode = false;
+            removeEdgeMode = false;
+            connectSource = null;
+            info.textContent = deleteMode ? 'Click a device to delete.' : '';
+            setActiveBtn('delete');
+        };
+        btns.removeEdge.onclick = function() {
+            removeEdgeMode = !removeEdgeMode;
+            connectMode = false;
+            deleteMode = false;
+            connectSource = null;
+            info.textContent = removeEdgeMode ? 'Click an edge to remove.' : '';
+            setActiveBtn('removeEdge');
+        };
+        function clamp(val, min, max) {
+            return Math.max(min, Math.min(max, val));
+        }
+        document.getElementById('randomGraph').onclick = async function() {
+            const result = generateRandomConnectedGraph(10);
+            nodes = result.nodes;
+            links = result.links;
+            nodeId = nodes.length ? Math.max(...nodes.map(n => n.id)) + 1 : 1;
+            dfsPath = null;
+            await runForceLayout(nodes, links);
+            // Clamp node positions to stay within the visible area
+            for (const node of nodes) {
+                node.x = clamp(node.x, 40, width - 40);
+                node.y = clamp(node.y, 40, height - 40);
+            }
+            update();
+        };
+        async function animateDFSPath(path) {
+            if (!path || path.length === 0) return;
+            
+            // First, update the graph to show all nodes and links
+            update();
+            
+            // Clear any existing highlights first
+            d3.selectAll('.node circle').classed('highlighted', false);
+            d3.selectAll('.link').classed('highlighted', false);
+            
+            // Get all node and link elements after the update
+            const nodeElements = d3.selectAll('.node').nodes();
+            const linkElements = d3.selectAll('.link').nodes();
+            
+            // Highlight the starting node
+            const startNode = path[0];
+            const startNodeElement = nodeElements.find(el => 
+                el.__data__ && el.__data__.id === startNode.id
+            );
+            if (startNodeElement) {
+                d3.select(startNodeElement).select('circle').classed('highlighted', true);
+            }
+            
+            // Store references to all highlighted elements for later cleanup
+            const highlightedElements = [];
+            
+            // Animate through the path
+            for (let i = 1; i < path.length; i++) {
+                const prevNode = path[i-1];
+                const currNode = path[i];
+                
+                // Find and highlight the link between these nodes
+                const link = links.find(l => 
+                    (l.source === prevNode && l.target === currNode) || 
+                    (l.source === currNode && l.target === prevNode)
+                );
+                
+                if (link) {
+                    const linkElement = linkElements.find(el => {
+                        const d = el.__data__;
+                        return d && (
+                            (d.source === link.source && d.target === link.target) ||
+                            (d.source === link.target && d.target === link.source)
+                        );
+                    });
+                    
+                    if (linkElement) {
+                        const linkSelection = d3.select(linkElement).classed('highlighted', true);
+                        highlightedElements.push(linkSelection);
+                    }
+                }
+                
+                // Highlight the current node
+                const currNodeElement = nodeElements.find(el => 
+                    el.__data__ && el.__data__.id === currNode.id
+                );
+                if (currNodeElement) {
+                    const nodeSelection = d3.select(currNodeElement).select('circle').classed('highlighted', true);
+                    highlightedElements.push(nodeSelection);
+                }
+                
+                // Add a small delay between steps for better visualization
+                await new Promise(resolve => setTimeout(resolve, 500));
+            }
+            
+            // After animation completes, clear highlights after a delay
+            setTimeout(() => {
+                // Clear all highlights
+                d3.selectAll('.node circle').classed('highlighted', false);
+                d3.selectAll('.link').classed('highlighted', false);
+                
+                // Force a redraw to ensure highlights are cleared
+                update();
+            }, 2000); // 2 seconds after animation completes
+        }
+
+        document.getElementById('dfsVisualize').onclick = async function() {
+            const startId = parseInt(document.getElementById('dfsStart').value);
+            const endId = parseInt(document.getElementById('dfsEnd').value);
+            
+            // Clear previous highlights
+            d3.selectAll('.node circle, .link').classed('highlighted', false);
+            
+            // Find the path
+            const dfsPath = dfs(nodes, links, startId, endId);
+            
+            if (dfsPath && dfsPath.length > 0) {
+                info.textContent = `Found path from ${dfsPath[0].label} to ${dfsPath[dfsPath.length-1].label}`;
+                await animateDFSPath(dfsPath);
+                
+                // Clear the info message after animation completes
+                setTimeout(() => {
+                    info.textContent = '';
+                }, 2000);
+            } else {
+                info.textContent = `No path found between selected nodes`;
+                // Clear the message after 3 seconds
+                setTimeout(() => {
+                    info.textContent = '';
+                }, 3000);
+                update();
+            }
+        };
+        function setActiveBtn(mode) {
+            for (const key in btns) {
+                if (key === mode && (connectMode || deleteMode || removeEdgeMode)) {
+                    btns[key].classList.add('active');
+                } else {
+                    btns[key].classList.remove('active');
+                }
+            }
+            const bfsPanel = document.getElementById('bfsFloatingPanel');
+            const dfsPanel = document.getElementById('dfsFloatingPanel');
+            const bridgePanel = document.getElementById('bridgeFloatingPanel');
+            if (mode === 'bfs') {
+                bfsPanel.classList.add('visible');
+                dfsPanel.classList.remove('visible');
+                bridgePanel.classList.remove('visible');
+            } else if (mode === 'dfs') {
+                bfsPanel.classList.remove('visible');
+                dfsPanel.classList.add('visible');
+                bridgePanel.classList.remove('visible');
+            } else if (mode === 'bridge') {
+                bfsPanel.classList.remove('visible');
+                dfsPanel.classList.remove('visible');
+                bridgePanel.classList.add('visible');
+            }
+        }
+        svg.on('click', function() {
+            selectedNode = null;
+            selectedLink = null;
+            connectSource = null;
+            info.textContent = '';
+            update();
+        });
+        update();
+
+        // On load, set SVG background color
+        document.getElementById('network').style.backgroundColor = getComputedStyle(document.body).getPropertyValue('--bg').trim();
+
+        // BFS implementation
+        function bfs(nodes, links, startId, endId) {
+            const adj = {};
+            for (const node of nodes) adj[node.id] = [];
+            for (const e of links) {
+                adj[e.source.id].push(e.target.id);
+                adj[e.target.id].push(e.source.id);
+            }
+            
+            const visited = new Set([startId]);
+            const queue = [[startId, [nodes.find(n => n.id === startId)]]];
+            
+            while (queue.length > 0) {
+                const [currentId, path] = queue.shift();
+                
+                if (currentId === endId) {
+                    return path;
+                }
+                
+                for (const neighbor of adj[currentId]) {
+                    if (!visited.has(neighbor)) {
+                        visited.add(neighbor);
+                        const nextNode = nodes.find(n => n.id === neighbor);
+                        queue.push([neighbor, [...path, nextNode]]);
+                    }
+                }
+            }
+            
+            return null;
+        }
+
+        // BFS visualization
+        document.getElementById('bfsVisualize').onclick = async function() {
+            const startId = parseInt(document.getElementById('bfsStart').value);
+            const endId = parseInt(document.getElementById('bfsEnd').value);
+            
+            // Clear previous highlights
+            d3.selectAll('.node circle, .link').classed('highlighted', false);
+            
+            // Find the path using BFS
+            const path = bfs(nodes, links, startId, endId);
+            
+            if (path && path.length > 0) {
+                info.textContent = `Found BFS path from ${path[0].label} to ${path[path.length-1].label}`;
+                await animateBFSPath(path);
+                
+                // Clear the info message after animation completes
+                setTimeout(() => {
+                    info.textContent = '';
+                }, 2000);
+            } else {
+                info.textContent = `No BFS path found between selected nodes`;
+                // Clear the message after 3 seconds
+                setTimeout(() => {
+                    info.textContent = '';
+                }, 3000);
+                update();
+            }
+        };
+
+        async function animateBFSPath(path) {
+            if (!path || path.length === 0) return;
+            
+            // First, update the graph to show all nodes and links
+            update();
+            
+            // Clear any existing highlights first
+            d3.selectAll('.node circle').classed('highlighted', false);
+            d3.selectAll('.link').classed('highlighted', false);
+            
+            // Get all node and link elements after the update
+            const nodeElements = d3.selectAll('.node').nodes();
+            const linkElements = d3.selectAll('.link').nodes();
+            
+            // Highlight the starting node
+            const startNode = path[0];
+            const startNodeElement = nodeElements.find(el => 
+                el.__data__ && el.__data__.id === startNode.id
+            );
+            if (startNodeElement) {
+                d3.select(startNodeElement).select('circle').classed('highlighted', true);
+            }
+            
+            // Store references to all highlighted elements for later cleanup
+            const highlightedElements = [];
+            
+            // Animate through the path
+            for (let i = 1; i < path.length; i++) {
+                const prevNode = path[i-1];
+                const currNode = path[i];
+                
+                // Find and highlight the link between these nodes
+                const link = links.find(l => 
+                    (l.source === prevNode && l.target === currNode) || 
+                    (l.source === currNode && l.target === prevNode)
+                );
+                
+                if (link) {
+                    const linkElement = linkElements.find(el => {
+                        const d = el.__data__;
+                        return d && (
+                            (d.source === link.source && d.target === link.target) ||
+                            (d.source === link.target && d.target === link.source)
+                        );
+                    });
+                    
+                    if (linkElement) {
+                        const linkSelection = d3.select(linkElement).classed('highlighted', true);
+                        highlightedElements.push(linkSelection);
+                    }
+                }
+                
+                // Highlight the current node
+                const currNodeElement = nodeElements.find(el => 
+                    el.__data__ && el.__data__.id === currNode.id
+                );
+                if (currNodeElement) {
+                    const nodeSelection = d3.select(currNodeElement).select('circle').classed('highlighted', true);
+                    highlightedElements.push(nodeSelection);
+                }
+                
+                // Add a small delay between steps for better visualization
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+            
+            // After animation completes, clear highlights after a delay
+            setTimeout(() => {
+                // Clear all highlights
+                d3.selectAll('.node circle').classed('highlighted', false);
+                d3.selectAll('.link').classed('highlighted', false);
+                
+                // Force a redraw to ensure highlights are cleared
+                update();
+            }, 2000); // 2 seconds after animation completes
+        }
+
+        // Update both BFS and DFS dropdowns
+        function updateDropdowns() {
+            const startDfs = document.getElementById('dfsStart');
+            const endDfs = document.getElementById('dfsEnd');
+            const startBfs = document.getElementById('bfsStart');
+            const endBfs = document.getElementById('bfsEnd');
+            const dfsPanel = document.getElementById('dfsFloatingPanel');
+            const bridgePanel = document.getElementById('bridgeFloatingPanel');
+        
+            // Clear existing options
+            startDfs.innerHTML = '';
+            endDfs.innerHTML = '';
+            startBfs.innerHTML = '';
+            endBfs.innerHTML = '';
+            
+            // Add options for each node
+            nodes.forEach(node => {
+                const option = document.createElement('option');
+                option.value = node.id;
+                option.textContent = node.label;
+                
+                // Add to all dropdowns
+                startDfs.appendChild(option.cloneNode(true));
+                endDfs.appendChild(option.cloneNode(true));
+                startBfs.appendChild(option.cloneNode(true));
+                endBfs.appendChild(option.cloneNode(true));
+            });
+            
+            // Set default selection (if there are at least 2 nodes)
+            if (nodes.length > 1) {
+                endDfs.selectedIndex = 1;
+                endBfs.selectedIndex = 1;
+            }
+        }
+
+        // Tab switching functionality
+        function switchTab(algo) {
+            // Update active tab
+            document.querySelectorAll('.algo-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.algo-tab[data-algo="${algo}"]`).classList.add('active');
+            
+            // Get all panels
+            const bfsPanel = document.getElementById('bfsFloatingPanel');
+            const dfsPanel = document.getElementById('dfsFloatingPanel');
+            const bridgePanel = document.getElementById('bridgeFloatingPanel');
+            
+            // Hide all panels first
+            [bfsPanel, dfsPanel, bridgePanel].forEach(panel => {
+                panel.classList.remove('visible');
+                panel.style.display = 'none';
+            });
+            
+            // Show the selected panel
+            let activePanel = null;
+            if (algo === 'bfs') {
+                activePanel = bfsPanel;
+            } else if (algo === 'dfs') {
+                activePanel = dfsPanel;
+            } else if (algo === 'bridge') {
+                activePanel = bridgePanel;
+            }
+            
+            if (activePanel) {
+                activePanel.style.display = 'block';
+                activePanel.classList.add('visible');
+            }
+            
+            // Clear any highlights when switching tabs
+            d3.selectAll('.link')
+                .classed('highlighted', false)
+                .style('stroke', getComputedStyle(document.documentElement).getPropertyValue('--link').trim())
+                .style('stroke-width', '3px')
+                .style('stroke-opacity', '0.7');
+            
+            info.textContent = '';
+        }
+        
+        // Add click handlers for tabs
+        document.querySelectorAll('.algo-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                const algo = this.getAttribute('data-algo');
+                switchTab(algo);
+            });
+        });
+        
+        // Bridge detection implementation
+        function findBridges(nodes, links) {
+            // Create an adjacency list
+            const adj = new Map();
+            const nodeMap = new Map();
+            const idToNode = new Map();
+            
+            nodes.forEach(node => {
+                adj.set(node.id, []);
+                nodeMap.set(node.id, node);
+                idToNode.set(node.id, node);
+            });
+            
+            // Create a map to store edge objects for highlighting
+            const edgeMap = new Map();
+            
+            links.forEach(link => {
+                adj.get(link.source.id).push(link.target.id);
+                adj.get(link.target.id).push(link.source.id);
+                
+                // Store edge in both directions for easy lookup
+                const key1 = `${link.source.id}-${link.target.id}`;
+                const key2 = `${link.target.id}-${link.source.id}`;
+                edgeMap.set(key1, link);
+                edgeMap.set(key2, link);
+            });
+            
+            const visited = new Set();
+            const disc = new Map();
+            const low = new Map();
+            const parent = new Map();
+            let time = 0;
+            const bridges = [];
+            
+            // Initialize
+            nodes.forEach(node => {
+                disc.set(node.id, 0);
+                low.set(node.id, 0);
+                parent.set(node.id, null);
+            });
+            
+            function dfs(u) {
+                visited.add(u);
+                disc.set(u, ++time);
+                low.set(u, time);
+                
+                for (const v of adj.get(u)) {
+                    if (!visited.has(v)) {
+                        parent.set(v, u);
+                        dfs(v);
+                        
+                        // Update low value of u
+                        low.set(u, Math.min(low.get(u), low.get(v)));
+                        
+                        // If the lowest vertex reachable from subtree under v
+                        // is below u in DFS tree, then u-v is a bridge
+                        if (low.get(v) > disc.get(u)) {
+                            bridges.push([u, v]);
+                        }
+                    } else if (v !== parent.get(u)) {
+                        // Update low value of u for parent function calls
+                        low.set(u, Math.min(low.get(u), disc.get(v)));
+                    }
+                }
+            }
+            
+            // Call the recursive helper function to find bridges in DFS tree
+            nodes.forEach(node => {
+                if (!visited.has(node.id)) {
+                    dfs(node.id);
+                }
+            });
+            
+            // Convert node IDs back to edge objects
+            return bridges.map(([u, v]) => {
+                const key = `${u}-${v}`;
+                return edgeMap.get(key);
+            }).filter(edge => edge !== undefined);
+        }
+        
+        // Handle bridge detection button click
+        document.getElementById('findBridges').addEventListener('click', function() {
+            // Reset previous highlights
+            d3.selectAll('.link')
+                .classed('highlighted', false)
+                .style('stroke', function() {
+                    return d3.select(this).classed('highlighted') ? '#ff9800' : getComputedStyle(document.documentElement).getPropertyValue('--link').trim();
+                });
+            
+            const bridges = findBridges(nodes, links);
+            
+            if (bridges.length === 0) {
+                info.textContent = 'No bridges found in the graph.';
+                return;
+            }
+            
+            // Highlight the bridges
+            d3.selectAll('.link')
+                .filter(link => bridges.some(b => 
+                    (b.source.id === link.source.id && b.target.id === link.target.id) ||
+                    (b.source.id === link.target.id && b.target.id === link.source.id)
+                ))
+                .classed('highlighted', true)
+                .style('stroke', '#ff0000')
+                .style('stroke-width', '5px')
+                .style('stroke-opacity', '1');
+            
+            info.textContent = `Found ${bridges.length} bridge(s) in the graph (highlighted in red).`;
+            
+            // Reset highlights after 10 seconds
+            setTimeout(() => {
+                d3.selectAll('.link')
+                    .classed('highlighted', false)
+                    .style('stroke', function() {
+                        return getComputedStyle(document.documentElement).getPropertyValue('--link').trim();
+                    })
+                    .style('stroke-width', '3px')
+                    .style('stroke-opacity', '0.7');
+                
+                info.textContent = '';
+            }, 10000);
+        });
+        
+        // Initialize with BFS panel visible
+        document.addEventListener('DOMContentLoaded', function() {
+            updateDropdowns();
+            // Set initial visibility
+            document.querySelectorAll('.bfs-floating-panel, .dfs-floating-panel, .bridge-floating-panel')
+                .forEach(panel => panel.style.display = 'none');
+            document.getElementById('bfsFloatingPanel').style.display = 'block';
+            switchTab('bfs'); // Show BFS panel by default
+        });
+    </script>
+</body>
+</html>
+</html> 
